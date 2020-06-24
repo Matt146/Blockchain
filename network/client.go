@@ -21,6 +21,7 @@ func (net *Network) Join(addr string) Packet {
 		SourceIP:      "",
 		DestinationIP: addr,
 		Data:          []byte("Pls man. Let me join"),
+		HopLimit:      HopLimitDefault,
 	}
 
 	return p
