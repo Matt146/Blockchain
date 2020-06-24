@@ -12,7 +12,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+var mux sync.Mutex
+var wg sync.WaitGroup
+var finishedMining bool
+var nonceSolution []byte
 
 const (
 	// letterBytes - This is the random selection of bytes GenRandBytes picks from
@@ -192,7 +198,7 @@ func (bc *Blockchain) AddBlock(b *Block) bool {
 **********************************/
 
 // HashBlock - Generates a hash to a block in the blockchain,
-// then assigns the hash to the block and returns it
+// then returns it as a byte slice
 func (b *Block) HashBlock() []byte {
 	// here is the buffer that stores the data temporarily
 	var buff string
@@ -227,15 +233,14 @@ func (b *Block) HashBlock() []byte {
 	// and return it
 	hasher := sha256.New()
 	hasher.Write([]byte(buff))
-	sum := hasher.Sum(nil)
-	b.Hash = sum
-	return sum
+	return hasher.Sum(nil)
 }
 
 // MineBlock - This takes a block and hashes and updates
 // the nonce, until it produces a hash that matches the difficulty
 // rating of the block. Then, assigns the nonce
 // that made it happen, and finally returns the block
+// NOTE: YOU CAN'T RUN THIS CONCURRENTLY
 func (b *Block) MineBlock() []byte {
 	var nonce []byte
 	var count int64 = 0
@@ -246,7 +251,7 @@ func (b *Block) MineBlock() []byte {
 		b.Nonce = nonce
 
 		// Second, hash the block
-		b.HashBlock()
+		b.Hash = b.HashBlock()
 
 		// Next, check how many bytes that are equal to zero there are in a row
 		var numZero uint32 = 0
@@ -259,13 +264,16 @@ func (b *Block) MineBlock() []byte {
 
 		// Then, check to see if that number corresponds to the difficulty
 		if numZero == b.Difficulty {
+			count++
+			fmt.Printf("[%d] Nonce: %s | Hash: %s\n", count, base64.URLEncoding.EncodeToString(nonce),
+				base64.URLEncoding.EncodeToString(b.Hash))
 			break
 		}
 
 		// Debug:
-		count += 1
-		fmt.Printf("[%d] Nonce: %s | Hash: %s\n", count, base64.URLEncoding.EncodeToString(nonce),
-			base64.URLEncoding.EncodeToString(b.Hash))
+		count++
+		//fmt.Printf("[%d] Nonce: %s | Hash: %s\n", count, base64.URLEncoding.EncodeToString(nonce),
+		//	base64.URLEncoding.EncodeToString(b.Hash))
 	}
 
 	return nonce
@@ -284,7 +292,7 @@ func (b *Block) BlockHashIsValid() bool {
 	bCopy = *b
 	copy(bCopy.Hash, b.Hash)
 
-	bCopy.HashBlock()
+	bCopy.Hash = bCopy.HashBlock()
 	if bytes.Compare(bCopy.Hash, b.Hash) == 0 {
 		// Get the number of prefixing zeroes
 		var numZero uint32 = 0
@@ -322,6 +330,7 @@ func RemoveTransaction(TXs []Transaction, index int) []Transaction {
 // true.
 // If you would like to not factor in the current transaction pool,
 // please pass an empty slice
+// (@TODO-OPTIMIZE)
 func (bc *Blockchain) BlockIsValid(b *Block, txpool []Transaction) bool {
 	var invalidTXIndicies []int
 
@@ -358,6 +367,7 @@ func (bc *Blockchain) BlockIsValid(b *Block, txpool []Transaction) bool {
 
 // BlockInBlockchainIsValid - Checks to see if a specific index
 // of a block in the blockchain is valid
+// (@TODO-OPTIMIZE)
 func (bc *Blockchain) BlockInBlockchainIsValid(index int64) bool {
 	for i, b := range *bc {
 		// First check if the hash is valid
