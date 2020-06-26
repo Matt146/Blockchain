@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -110,7 +111,7 @@ func (net *Network) JoinHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Now, also add the joining node to the routing table
 	net.mux.Lock()
-	newNode := Node{ID: netID, IPAddr: r.RemoteAddr, CPUPower: 10, NetPower: 10}
+	newNode := Node{ID: netID, IPAddr: strings.Split(r.RemoteAddr, ":")[0], CPUPower: 10, NetPower: 10}
 	net.Nodes[string(netID)] = newNode
 	net.mux.Unlock()
 
@@ -144,6 +145,64 @@ func (net *Network) LeaveHandler(w http.ResponseWriter, r *http.Request) {
 		// the node from our routing table
 		net.mux.Lock()
 		delete(net.Nodes, string(p.SourceID))
+		net.mux.Unlock()
+	}
+}
+
+// PingHandler - Handle a ping packet
+func (net *Network) PingHandler(w http.ResponseWriter, r *http.Request) {
+	result, err := net.RouteIfNeeded(w, r)
+	if err != nil {
+		w.Write([]byte("Decoding error! Please try again!"))
+		return
+	}
+
+	if result == 1 {
+		// @TODO CHANGE: Respond with just a simple ACK
+		w.Write([]byte("ACK"))
+
+		// Now, deserialize the packet to get the source IP
+		pRecved, err := DeserializeFromForm(r)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		// Now, send a pong response
+		err = net.Pong(pRecved.SourceID, pRecved.SourceIP)
+		log.Error(err)
+		fmt.Println("Received ping!")
+	}
+}
+
+// PongHandler - Handle a pong packet
+func (net *Network) PongHandler(w http.ResponseWriter, r *http.Request) {
+	result, err := net.RouteIfNeeded(w, r)
+	if err != nil {
+		w.Write([]byte("Decoding error! Please try again!"))
+		return
+	}
+
+	if result == 1 {
+		// @TODO CHANGE: Respond with just a simple ACK
+		w.Write([]byte("ACK"))
+
+		// Now, deserialize the packet to get the source IP
+		// and source ID
+		pRecved, err := DeserializeFromForm(r)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		// Now, cache the node
+		net.mux.Lock()
+		net.Nodes[string(pRecved.SourceID)] = Node{
+			ID:       pRecved.SourceID,
+			IPAddr:   pRecved.SourceIP,
+			CPUPower: 10,
+			NetPower: 10,
+		}
 		net.mux.Unlock()
 	}
 }

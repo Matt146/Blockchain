@@ -29,6 +29,7 @@ func main() {
 	// Start Server
 	net := network.MakeNetwork()
 	http.HandleFunc("/JOIN", net.JoinHandler)
+	http.HandleFunc("/PING", net.PingHandler)
 	wg.Add(1)
 	defer wg.Done()
 	go func() {
@@ -43,6 +44,9 @@ func main() {
 		log.Error(err)
 	}
 	fmt.Printf("Client ID: %s\n", net.MyIP)
+	for k := range net.Nodes {
+		net.Ping([]byte(k))
+	}
 
 	// Wait now
 	wg.Wait()

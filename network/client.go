@@ -26,6 +26,7 @@ func (net *Network) Join(addr string) error {
 		DestinationIP: addr,
 		Data:          []byte("Pls man. Let me join"),
 		HopLimit:      HopLimitDefault,
+		SendType:      PacketSingleCast,
 	}
 
 	// Create the client and the request
@@ -42,7 +43,7 @@ func (net *Network) Join(addr string) error {
 		"DestinationIP": {p.DestinationIP},
 		"Data":          {base64.URLEncoding.EncodeToString(p.Data)},
 		"HopLimit":      {strconv.FormatUint(uint64(p.HopLimit), blockchain.Base)},
-		"SendType":      {strconv.FormatUint(uint64(PacketSingleCast), blockchain.Base)},
+		"SendType":      {strconv.FormatUint(uint64(p.SendType), blockchain.Base)},
 	}
 
 	// Craft the request
@@ -80,4 +81,66 @@ func (net *Network) Join(addr string) error {
 	net.mux.Unlock()
 
 	return nil
+}
+
+// Ping - Used to ping another peer to make sure that they are still active
+func (net *Network) Ping(peerID []byte) error {
+	p := Packet{
+		Version:       Version,
+		Type:          "PING",
+		SourceID:      net.MyID,
+		DestinationID: []byte(""),
+		SourceIP:      net.MyIP,
+		DestinationIP: "",
+		Data:          []byte("Ping :D"),
+		HopLimit:      HopLimitDefault,
+		SendType:      PacketSingleCast,
+	}
+	err := net.SendPacket(&p)
+	return err
+}
+
+// Pong - Send this packet to respond to a ping request. If peerIP is
+// empty, send the packet through the network. If it isn't, send
+// the packet directly
+func (net *Network) Pong(peerID []byte, peerIP string) error {
+	p := Packet{
+		Version:       Version,
+		Type:          "PONG",
+		SourceID:      net.MyID,
+		DestinationID: peerID,
+		SourceIP:      net.MyIP,
+		DestinationIP: peerIP,
+		Data:          []byte("Pong :D"),
+		HopLimit:      HopLimitDefault,
+		SendType:      PacketSingleCast,
+	}
+	if peerIP == "" {
+		err := net.SendPacket(&p)
+		return err
+	}
+	_, err := net.SendPacketDirectly(&p)
+	return err
+}
+
+// SendMSG - Send a message to a peer
+func (net *Network) SendMSG(peerID []byte) error {
+	return nil
+}
+
+// BroadcastMSG - Broadcasts a message to all peers
+func (net *Network) BroadcastMSG(data []byte) error {
+	p := Packet{
+		Version:       Version,
+		Type:          "MSG",
+		SourceID:      net.MyID,
+		DestinationID: []byte(""), // this gets filled in when the message gets broadcasted
+		SourceIP:      net.MyIP,
+		DestinationIP: "", // this gets filled in when the message gets broadcasted
+		Data:          data,
+		HopLimit:      HopLimitDefault,
+		SendType:      PacketSingleCast,
+	}
+	err := net.BroadcastPacket(p)
+	return err
 }

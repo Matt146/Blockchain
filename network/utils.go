@@ -167,6 +167,28 @@ func (net *Network) SendPacket(p *Packet) error {
 	return nil
 }
 
+// SendPacketDirectly - Use this function to send
+// a packet directly to an IP address without having
+// to deal with going through the entire network.
+// The IP addresss to send it to is specified in the p.DestinationIP
+func (net *Network) SendPacketDirectly(p *Packet) (*http.Response, error) {
+	// Create the client
+	client := &http.Client{}
+
+	// Craft the form values for the request
+	formValues := p.SerializeToForm()
+
+	// Craft the request
+	req, err := http.NewRequest("POST", "http://"+p.SourceIP+Port+"/"+p.Type, strings.NewReader(formValues.Encode()))
+	if err != nil {
+		return nil, err
+	}
+
+	// Send the request
+	resp, err := client.Do(req)
+	return resp, err
+}
+
 // BroadcastPacket - Use this function to
 // broadcast a packet to all other nodes in
 // a network
