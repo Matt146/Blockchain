@@ -9,5 +9,6 @@ require (
 	github.com/libp2p/go-libp2p-gostream v0.2.1
 	github.com/libp2p/go-libp2p-http v0.1.5
 	github.com/multiformats/go-multiaddr v0.2.1
+	github.com/opentracing/opentracing-go v1.1.0
 	github.com/sqs/goreturns v0.0.0-20181028201513-538ac6014518 // indirect
 )
