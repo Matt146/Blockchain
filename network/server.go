@@ -38,19 +38,47 @@ func (net *Network) RouteIfNeeded(w http.ResponseWriter, r *http.Request) (int, 
 		return 5000, err
 	}
 
-	// Now check destination IP and ID. If they match my destination ID
-	// and IP, return because the packet is meant for me. Otherwise, keep
-	// going in the function to route the packet
-	if bytes.Compare(p.DestinationID, net.MyID) == 0 {
-		if strings.Compare(r.FormValue("DestinationIP"), net.MyIP) == 0 {
-			return 1, nil
+	// Print debug information about packet
+	fmt.Println("Packet DEBUG information:")
+	fmt.Println("=========================")
+	fmt.Printf("Source ID: %v\n", p.SourceID)
+	fmt.Printf("Destination ID: %v\n", p.DestinationID)
+	fmt.Printf("My ID: %v\n", net.MyID)
+	fmt.Printf("Source IP: %v\n", p.SourceIP)
+	fmt.Printf("Destination IP: %v\n", p.DestinationIP)
+	fmt.Printf("My IP: %v\n", p.DestinationIP)
+	fmt.Printf("Type: %v\n", p.Type)
+	fmt.Println("=========================")
+
+	/*
+		// Now check destination IP and ID. If they match my destination ID
+		// and IP, return because the packet is meant for me. Otherwise, keep
+		// going in the function to route the packet
+		if bytes.Compare(p.DestinationID, net.MyID) == 0 {
+			if strings.Compare(r.FormValue("DestinationIP"), net.MyIP) == 0 {
+				fmt.Printf("Packet is for me :D\n")
+				return 1, nil
+			}
 		}
+	*/
+
+	// Now check the destination ID. If it matches my ID, return because
+	// the packet is meant for me. Otherwise, keep going in the function
+	// to route the packet
+	if bytes.Compare(p.DestinationID, net.MyID) == 0 {
+		fmt.Println("Packet is for me: :D")
+		return 1, nil
 	}
 
 	// Now, check if the source IP and ID are equal to my IP and ID. Return if it
 	// is.
 	if bytes.Compare(p.SourceID, net.MyID) == 0 {
 		if strings.Compare(r.FormValue("SourceIP"), net.MyIP) == 0 {
+			fmt.Printf("My own packet was sent back to me :(\n")
+			fmt.Printf("ID: Source: %v | Destination: %v\n", p.SourceID, p.DestinationID)
+			fmt.Printf("IP: Source: %v | Destination: %v\n", p.SourceIP, p.DestinationIP)
+			fmt.Printf("My ID: %v\n", net.MyID)
+			fmt.Printf("My IP: %v\n", net.MyIP)
 			return 2, nil
 		}
 	}
@@ -107,6 +135,7 @@ func (net *Network) JoinHandler(w http.ResponseWriter, r *http.Request) {
 	// Generate a response
 	netID := blockchain.GenRandBytes(32)
 	ipParsed := strings.Split(r.RemoteAddr, ":")[0]
+	ipParsed += ":" + r.FormValue("SourceIP")
 	joinresp := &JoinResp{Net: net, ID: netID, IP: ipParsed,
 		BootstrapNode: Node{
 			ID:       net.MyID,
@@ -173,6 +202,7 @@ func (net *Network) PingHandler(w http.ResponseWriter, r *http.Request) {
 	result, err := net.RouteIfNeeded(w, r)
 	if err != nil {
 		fmt.Println("ERROR HAPPENED")
+		fmt.Println(err)
 		w.Write([]byte("Decoding error! Please try again!"))
 		return
 	}
@@ -207,6 +237,7 @@ func (net *Network) PongHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if result == 1 {
+		fmt.Println("HANDLING PONG! YAY!")
 		// @TODO CHANGE: Respond with just a simple ACK
 		w.Write([]byte("ACK"))
 

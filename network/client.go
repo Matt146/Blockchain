@@ -10,16 +10,20 @@ import (
 )
 
 // Join - This function takes a boot node
-// hostname and joins the network.
+// hostname (IP:port)and joins the network.
 // It gets assigned it's ID, it's IP
 // and gets sent the routing table.
-func (net *Network) Join(addr string) error {
+// In the source IP, we put the port that we
+// plan to listen on with no other data.
+// That way, we can use multiple ports and multiple
+// devices in a NAT network.
+func (net *Network) Join(addr string, listeningPort int) error {
 	p := Packet{
 		PVersion:      ProtocolVersion,
 		Type:          "JOIN",
 		SourceID:      net.MyID,
 		DestinationID: []byte(""),
-		SourceIP:      "",
+		SourceIP:      "" + strconv.FormatInt(int64(listeningPort), 10),
 		DestinationIP: addr,
 		Data:          []byte("Pls man. Let me join"),
 		HopLimit:      HopLimitDefault,
@@ -34,7 +38,7 @@ func (net *Network) Join(addr string) error {
 	formValues := p.SerializeToForm()
 
 	// Craft the request
-	req, err := http.NewRequest("POST", "http://"+addr+Port+"/"+"JOIN", strings.NewReader(formValues.Encode()))
+	req, err := http.NewRequest("POST", "http://"+addr+"/"+"JOIN", strings.NewReader(formValues.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(formValues.Encode())))
 	if err != nil {
@@ -115,6 +119,7 @@ func (net *Network) Pong(peerID []byte, peerIP string) error {
 		return err
 	}
 	_, err := net.SendPacketDirectly(p)
+	fmt.Println(err)
 	return err
 }
 

@@ -35,8 +35,8 @@ const (
 
 // Node - Models a singular node in the network
 type Node struct {
-	ID       []byte `json:"ID"`
-	IPAddr   string `json:"IPAddr"`   // This will be the unique identifier for each node
+	ID       []byte `json:"ID"`       // Unique identifier for each node
+	IPAddr   string `json:"IPAddr"`   // IP:Port
 	CPUPower int64  `json:"CPUPower"` // The CPU power of the node
 	NetPower int64  `json:"NetPower"` // The Network power of the node
 }
@@ -202,10 +202,22 @@ func (net *Network) SendPacket(p *Packet) error {
 	// Craft form values for request
 	formValues := p.SerializeToForm()
 
+	// Debug Send SendPacket
+	fmt.Println("SendPacket DEBUG information:")
+	fmt.Println("=============================")
+	fmt.Printf("Source ID: %v\n", p.SourceID)
+	fmt.Printf("Destination ID: %v\n", p.DestinationID)
+	fmt.Printf("My ID: %v\n", net.MyID)
+	fmt.Printf("Source IP: %v\n", p.SourceIP)
+	fmt.Printf("Destination IP: %v\n", p.DestinationIP)
+	fmt.Printf("My IP: %v\n", p.DestinationIP)
+	fmt.Printf("Type: %v\n", p.Type)
+	fmt.Println("=============================")
+
 	// Loop through and broadcast the packet
 	for i := range net.Nodes {
 		// Craft the request
-		req, err := http.NewRequest("POST", "http://"+net.Nodes[i].IPAddr+Port+"/"+p.Type, strings.NewReader(formValues.Encode()))
+		req, err := http.NewRequest("POST", "http://"+net.Nodes[i].IPAddr+"/"+p.Type, strings.NewReader(formValues.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Add("Content-Length", strconv.Itoa(len(formValues.Encode())))
 		if err != nil {
@@ -234,10 +246,23 @@ func (net *Network) SendPacketDirectly(p *Packet) (*http.Response, error) {
 	// Craft the form values for the request
 	formValues := p.SerializeToForm()
 
+	// Debug Send SendPacketDirectly
+	fmt.Println("SendPacketDirectly DEBUG information:")
+	fmt.Println("=============================")
+	fmt.Printf("Source ID: %v\n", p.SourceID)
+	fmt.Printf("Destination ID: %v\n", p.DestinationID)
+	fmt.Printf("My ID: %v\n", net.MyID)
+	fmt.Printf("Source IP: %v\n", p.SourceIP)
+	fmt.Printf("Destination IP: %v\n", p.DestinationIP)
+	fmt.Printf("My IP: %v\n", p.DestinationIP)
+	fmt.Printf("Type: %v\n", p.Type)
+	fmt.Println("=============================")
+
 	// Craft the request
-	req, err := http.NewRequest("POST", "http://"+p.SourceIP+Port+"/"+p.Type, strings.NewReader(formValues.Encode()))
+	req, err := http.NewRequest("POST", "http://"+p.DestinationIP+"/"+p.Type, strings.NewReader(formValues.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(formValues.Encode())))
+	fmt.Printf("URL: %s%s%s\n", req.URL.Scheme, req.URL.Host, req.URL.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +291,7 @@ func (net *Network) BroadcastPacket(p Packet) error {
 		formValues := p.SerializeToForm()
 
 		// Craft the request
-		req, err := http.NewRequest("POST", "http://"+net.Nodes[i].IPAddr+Port+"/"+p.Type, strings.NewReader(formValues.Encode()))
+		req, err := http.NewRequest("POST", "http://"+net.Nodes[i].IPAddr+"/"+p.Type, strings.NewReader(formValues.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Add("Content-Length", strconv.Itoa(len(formValues.Encode())))
 		if err != nil {
