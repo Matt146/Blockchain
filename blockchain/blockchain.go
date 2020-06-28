@@ -29,7 +29,7 @@ const (
 
 	// Base - This is the base to format uints and ints
 	// NOTE: ALL FLOATS ARE FORMATTED TO DECIMALS
-	Base = 16
+	Base = 10
 
 	// DefaultNonceLen - The default length of a nonce (in bytes)
 	DefaultNonceLen = 32

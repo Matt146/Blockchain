@@ -28,6 +28,9 @@ func main() {
 
 	// Start Server
 	net := network.MakeNetwork()
+	// Wont' work because it uses public IP and my router has NAT: net.BootstrapNetwork()
+	net.MyIP = "127.0.0.1"
+	net.MyID = blockchain.GenRandBytes(32)
 	http.HandleFunc("/JOIN", net.JoinHandler)
 	http.HandleFunc("/PING", net.PingHandler)
 	wg.Add(1)
@@ -43,10 +46,13 @@ func main() {
 	if err != nil {
 		log.Error(err)
 	}
-	fmt.Printf("Client ID: %s\n", net.MyIP)
+	fmt.Printf("Client IP: %s\n", net.MyIP)
 	for k := range net.Nodes {
+		fmt.Printf("Pinging peer: %v\n", []byte(k))
 		net.Ping([]byte(k))
 	}
+
+	fmt.Println("Hello, world!")
 
 	// Wait now
 	wg.Wait()

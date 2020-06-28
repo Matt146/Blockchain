@@ -1,13 +1,10 @@
 package network
 
 import (
-	"Blockchain/blockchain"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 )
@@ -18,7 +15,7 @@ import (
 // and gets sent the routing table.
 func (net *Network) Join(addr string) error {
 	p := Packet{
-		Version:       Version,
+		PVersion:      ProtocolVersion,
 		Type:          "JOIN",
 		SourceID:      net.MyID,
 		DestinationID: []byte(""),
@@ -34,20 +31,12 @@ func (net *Network) Join(addr string) error {
 
 	// Craft form values for request. Ideally, we would use a packet
 	// and serializing that into form values but idgaf
-	formValues := url.Values{
-		"Version":       {strconv.FormatUint(uint64(p.Version), blockchain.Base)},
-		"Type":          {p.Type},
-		"SourceID":      {base64.URLEncoding.EncodeToString(p.SourceID)},
-		"DestinationID": {base64.URLEncoding.EncodeToString(p.DestinationID)},
-		"SourceIP":      {p.SourceIP},
-		"DestinationIP": {p.DestinationIP},
-		"Data":          {base64.URLEncoding.EncodeToString(p.Data)},
-		"HopLimit":      {strconv.FormatUint(uint64(p.HopLimit), blockchain.Base)},
-		"SendType":      {strconv.FormatUint(uint64(p.SendType), blockchain.Base)},
-	}
+	formValues := p.SerializeToForm()
 
 	// Craft the request
 	req, err := http.NewRequest("POST", "http://"+addr+Port+"/"+"JOIN", strings.NewReader(formValues.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Content-Length", strconv.Itoa(len(formValues.Encode())))
 	if err != nil {
 		return err
 	}
@@ -75,28 +64,33 @@ func (net *Network) Join(addr string) error {
 	// Then, take the deserialized response and set it to the network
 	net.mux.Lock()
 	net.Nodes = joinRespDeserialized.Net.Nodes
+	net.Nodes[string(joinRespDeserialized.BootstrapNode.ID)] = joinRespDeserialized.BootstrapNode
 	net.MyID = joinRespDeserialized.ID
 	net.MyIP = joinRespDeserialized.IP
-	fmt.Printf("%v\n", net.MyID)
 	net.mux.Unlock()
+
+	// Now, print some debug information:
+	for k := range net.Nodes {
+		fmt.Printf("[+] Node received: %v\n", []byte(k))
+	}
 
 	return nil
 }
 
 // Ping - Used to ping another peer to make sure that they are still active
 func (net *Network) Ping(peerID []byte) error {
-	p := Packet{
-		Version:       Version,
+	p := &Packet{
+		PVersion:      ProtocolVersion,
 		Type:          "PING",
 		SourceID:      net.MyID,
-		DestinationID: []byte(""),
+		DestinationID: peerID,
 		SourceIP:      net.MyIP,
 		DestinationIP: "",
 		Data:          []byte("Ping :D"),
 		HopLimit:      HopLimitDefault,
 		SendType:      PacketSingleCast,
 	}
-	err := net.SendPacket(&p)
+	err := net.SendPacket(p)
 	return err
 }
 
@@ -104,8 +98,9 @@ func (net *Network) Ping(peerID []byte) error {
 // empty, send the packet through the network. If it isn't, send
 // the packet directly
 func (net *Network) Pong(peerID []byte, peerIP string) error {
-	p := Packet{
-		Version:       Version,
+	fmt.Println("Sending PONG")
+	p := &Packet{
+		PVersion:      ProtocolVersion,
 		Type:          "PONG",
 		SourceID:      net.MyID,
 		DestinationID: peerID,
@@ -116,10 +111,10 @@ func (net *Network) Pong(peerID []byte, peerIP string) error {
 		SendType:      PacketSingleCast,
 	}
 	if peerIP == "" {
-		err := net.SendPacket(&p)
+		err := net.SendPacket(p)
 		return err
 	}
-	_, err := net.SendPacketDirectly(&p)
+	_, err := net.SendPacketDirectly(p)
 	return err
 }
 
@@ -131,7 +126,7 @@ func (net *Network) SendMSG(peerID []byte) error {
 // BroadcastMSG - Broadcasts a message to all peers
 func (net *Network) BroadcastMSG(data []byte) error {
 	p := Packet{
-		Version:       Version,
+		PVersion:      ProtocolVersion,
 		Type:          "MSG",
 		SourceID:      net.MyID,
 		DestinationID: []byte(""), // this gets filled in when the message gets broadcasted
