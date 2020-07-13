@@ -24,10 +24,9 @@ func (p *Packet) AddToMsgQueue() {
 	msgQueue[string(p.SourceID)] = append(msgQueue[string(p.SourceID)], *p)
 }
 
-// HandleMsgQueuePackets - returns a copy of all
-// the pending packets in the queue for a specific peer to be handled
-// and then deletes all the packets in the queue for that peer.
-// Blocks the entire queue while running
+// HandleMsgQueuePackets - returns the message queue packets,
+// without copying them, and deletes any reference to them in the
+// internal msgQueue map
 func HandleMsgQueuePackets(peerID []byte) []Packet {
 	mux.Lock()
 	defer mux.Unlock()

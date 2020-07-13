@@ -50,6 +50,16 @@ func main() {
 
 	fmt.Println("Client sending JOIN request")
 
+	// Just echo the messages now
+	for {
+		for k := range net.Nodes {
+			packets := network.HandleMsgQueuePackets(net.Nodes[k].ID)
+			for _, v := range packets {
+				fmt.Println(string(v.Data))
+			}
+		}
+	}
+
 	// Wait now
 	wg.Wait()
 }
