@@ -10,7 +10,7 @@ import (
 
 // Wallet - wallet data
 type Wallet struct {
-	KeyPair *ecdsa.PrivateKey
+	KeyPair *ecdsa.PrivateKey `json:"KeyPair"`
 }
 
 // MakeWallet - Generate a wallet and return it

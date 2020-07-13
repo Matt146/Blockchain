@@ -220,6 +220,7 @@ func (net *Network) SendPacket(p *Packet) error {
 		req, err := http.NewRequest("POST", "http://"+net.Nodes[i].IPAddr+"/"+p.Type, strings.NewReader(formValues.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Add("Content-Length", strconv.Itoa(len(formValues.Encode())))
+		fmt.Printf("URL: %s://%s%s\n", req.URL.Scheme, req.URL.Host, req.URL.Path)
 		if err != nil {
 			return err
 		}
@@ -262,7 +263,7 @@ func (net *Network) SendPacketDirectly(p *Packet) (*http.Response, error) {
 	req, err := http.NewRequest("POST", "http://"+p.DestinationIP+"/"+p.Type, strings.NewReader(formValues.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(formValues.Encode())))
-	fmt.Printf("URL: %s%s%s\n", req.URL.Scheme, req.URL.Host, req.URL.Path)
+	fmt.Printf("URL: %s://%s%s\n", req.URL.Scheme, req.URL.Host, req.URL.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -285,15 +286,28 @@ func (net *Network) BroadcastPacket(p Packet) error {
 		// the packet
 		p.DestinationID = net.Nodes[i].ID
 		p.DestinationIP = net.Nodes[i].IPAddr
-		p.SendType = PacketSingleCast
+		p.SendType = PacketBroadCast
 
 		// Craft form values for request
 		formValues := p.SerializeToForm()
+
+		// Debug Send BroadcastPacket
+		fmt.Println("BroadcastPacket DEBUG information:")
+		fmt.Println("==================================")
+		fmt.Printf("Source ID: %v\n", p.SourceID)
+		fmt.Printf("Destination ID: %v\n", p.DestinationID)
+		fmt.Printf("My ID: %v\n", net.MyID)
+		fmt.Printf("Source IP: %v\n", p.SourceIP)
+		fmt.Printf("Destination IP: %v\n", p.DestinationIP)
+		fmt.Printf("My IP: %v\n", p.DestinationIP)
+		fmt.Printf("Type: %v\n", p.Type)
+		fmt.Println("==================================")
 
 		// Craft the request
 		req, err := http.NewRequest("POST", "http://"+net.Nodes[i].IPAddr+"/"+p.Type, strings.NewReader(formValues.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Add("Content-Length", strconv.Itoa(len(formValues.Encode())))
+		fmt.Printf("URL: %s://%s%s\n", req.URL.Scheme, req.URL.Host, req.URL.Path)
 		if err != nil {
 			return err
 		}

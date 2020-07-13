@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
-	"github.com/opentracing/opentracing-go/log"
+	elog "github.com/opentracing/opentracing-go/log"
 )
 
 // RouteIfNeeded - Should be called before doing anything with
@@ -95,18 +96,15 @@ func (net *Network) RouteIfNeeded(w http.ResponseWriter, r *http.Request) (int, 
 	// SendType
 	if p.SendType == PacketSingleCast {
 		err = net.SendPacket(p)
-		fmt.Println("SEND PACKET #1")
 		return 0, err
 	} else if p.SendType == PacketBroadCast {
 		err = net.BroadcastPacket(*p)
-		fmt.Println("SEND PACKET #2")
 		return 0, err
 	}
 
 	// The failsafe is just to send it
 	// rather than broadcast
 	err = net.SendPacket(p)
-	fmt.Println("SEND PACKET #3")
 	return 0, err
 }
 
@@ -151,10 +149,13 @@ func (net *Network) JoinHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("\tJOIN RESPONSE JSON:")
-	fmt.Printf("===============================\n")
-	fmt.Printf("%v\n", string(joinRespSerialized))
-	fmt.Printf("===============================\n")
+	fmt.Printf("Got JOIN request from: %v\n", r.RemoteAddr)
+	/*
+		fmt.Println("\tJOIN RESPONSE JSON:")
+		fmt.Printf("===============================\n")
+		fmt.Printf("%v\n", string(joinRespSerialized))
+		fmt.Printf("===============================\n")
+	*/
 
 	// Now, also add the joining node to the routing table
 	net.mux.Lock()
@@ -183,7 +184,7 @@ func (net *Network) LeaveHandler(w http.ResponseWriter, r *http.Request) {
 		// Now, forward the packet to everyone in the network
 		p, err := DeserializeFromForm(r)
 		if err != nil {
-			log.Error(err)
+			elog.Error(err)
 			return
 		}
 		net.BroadcastPacket(*p)
@@ -216,13 +217,13 @@ func (net *Network) PingHandler(w http.ResponseWriter, r *http.Request) {
 		// Now, deserialize the packet to get the source IP
 		pRecved, err := DeserializeFromForm(r)
 		if err != nil {
-			log.Error(err)
+			elog.Error(err)
 			return
 		}
 
 		// Now, send a pong response
 		err = net.Pong(pRecved.SourceID, pRecved.SourceIP)
-		log.Error(err)
+		elog.Error(err)
 	}
 }
 
@@ -245,7 +246,7 @@ func (net *Network) PongHandler(w http.ResponseWriter, r *http.Request) {
 		// and source ID
 		pRecved, err := DeserializeFromForm(r)
 		if err != nil {
-			log.Error(err)
+			elog.Error(err)
 			return
 		}
 
@@ -258,5 +259,69 @@ func (net *Network) PongHandler(w http.ResponseWriter, r *http.Request) {
 			NetPower: 10,
 		}
 		net.mux.Unlock()
+	}
+}
+
+// SendMSGHandler - THe handler function for a SendMSG request
+func (net *Network) SendMSGHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("[+] Received a SendMSG")
+	result, err := net.RouteIfNeeded(w, r)
+	if err != nil {
+		fmt.Println(result)
+		w.Write([]byte("Decoding error! Please try again!"))
+		return
+	}
+
+	if result == 1 {
+		log.Println("[+] Stuffing it into the MsgQueue")
+		packet, err := DeserializeFromForm(r)
+		if err != nil {
+			elog.Error(err)
+			return
+		}
+		packet.AddToMsgQueue()
+	}
+}
+
+// BroadcastMSGHandler - THe handler function for a BroadcastMSG request
+func (net *Network) BroadcastMSGHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("[+] Received a BroadcastMSG")
+	result, err := net.RouteIfNeeded(w, r)
+	if err != nil {
+		fmt.Println(result)
+		w.Write([]byte("Decoding error! Please try again!"))
+		return
+	}
+
+	if result == 1 {
+		log.Println("[+] Stuffing it into the MsgQueue")
+		packet, err := DeserializeFromForm(r)
+		if err != nil {
+			elog.Error(err)
+			return
+		}
+		packet.AddToMsgQueue()
+	}
+}
+
+// BroadcastMSGResponseHandler - The handler function  for
+// a BroadcastMSGResponse.
+func (net *Network) BroadcastMSGResponseHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("[+] Received a BroadcastMSGResponse")
+	result, err := net.RouteIfNeeded(w, r)
+	if err != nil {
+		fmt.Println(result)
+		w.Write([]byte("Decoding error! Please try again!"))
+		return
+	}
+
+	if result == 1 {
+		log.Println("[+] Stuffing it into the MsgQueue")
+		packet, err := DeserializeFromForm(r)
+		if err != nil {
+			elog.Error(err)
+			return
+		}
+		packet.AddToMsgQueue()
 	}
 }

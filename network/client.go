@@ -1,9 +1,10 @@
 package network
 
 import (
+	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -74,8 +75,9 @@ func (net *Network) Join(addr string, listeningPort int) error {
 	net.mux.Unlock()
 
 	// Now, print some debug information:
+	log.Println("[+] JOIN successful!")
 	for k := range net.Nodes {
-		fmt.Printf("[+] Node received: %v\n", []byte(k))
+		log.Printf("\t- Node received: %v\n", base64.URLEncoding.EncodeToString([]byte(k)))
 	}
 
 	return nil
@@ -94,7 +96,13 @@ func (net *Network) Ping(peerID []byte) error {
 		HopLimit:      HopLimitDefault,
 		SendType:      PacketSingleCast,
 	}
+	log.Printf("[+] Sending PING request to (%v, %v)\n", base64.URLEncoding.EncodeToString(p.DestinationID), net.Nodes[string(p.DestinationID)].IPAddr)
 	err := net.SendPacket(p)
+	if err != nil {
+		log.Printf("[+] Error occured during PING request: %s\n", err.Error())
+		return nil
+	}
+	log.Println("[+] PING successful!")
 	return err
 }
 
@@ -102,7 +110,6 @@ func (net *Network) Ping(peerID []byte) error {
 // empty, send the packet through the network. If it isn't, send
 // the packet directly
 func (net *Network) Pong(peerID []byte, peerIP string) error {
-	fmt.Println("Sending PONG")
 	p := &Packet{
 		PVersion:      ProtocolVersion,
 		Type:          "PONG",
@@ -114,33 +121,105 @@ func (net *Network) Pong(peerID []byte, peerIP string) error {
 		HopLimit:      HopLimitDefault,
 		SendType:      PacketSingleCast,
 	}
+	log.Printf("[+] Sending PONG response (%v, %v)\n", base64.URLEncoding.EncodeToString(p.DestinationID), net.Nodes[string(p.DestinationID)].IPAddr)
 	if peerIP == "" {
 		err := net.SendPacket(p)
-		return err
+		if err != nil {
+			log.Printf("[+] Error occured during PONG response: %s\n", err.Error())
+			return err
+		}
 	}
 	_, err := net.SendPacketDirectly(p)
-	fmt.Println(err)
-	return err
-}
-
-// SendMSG - Send a message to a peer
-func (net *Network) SendMSG(peerID []byte) error {
+	if err != nil {
+		log.Printf("[+] Error occured during PONG response: %s\n", err.Error())
+		return err
+	}
 	return nil
 }
 
-// BroadcastMSG - Broadcasts a message to all peers
-func (net *Network) BroadcastMSG(data []byte) error {
+// SendMSG - Send a message to a peer. Sends
+// a message to peerID. If you choose to send a packet directly
+// without going through the flooding algorithm,
+// supply a peerIP and don't just leave if blank.
+// The correct server will then reply through a standard
+// HTTP response, whether the packet is sent directly
+// or indirectly
+func (net *Network) SendMSG(peerID []byte, peerIP string, msg []byte) error {
+	p := &Packet{
+		PVersion:      ProtocolVersion,
+		Type:          "SendMSG",
+		SourceID:      net.MyID,
+		DestinationID: peerID,
+		SourceIP:      net.MyIP,
+		DestinationIP: peerIP,
+		Data:          msg,
+		HopLimit:      HopLimitDefault,
+		SendType:      PacketSingleCast,
+	}
+	log.Printf("[+] Sending SendMSG request (%v, %v)\n", base64.URLEncoding.EncodeToString(p.DestinationID), net.Nodes[string(p.DestinationID)].IPAddr)
+	if peerIP == "" {
+		err := net.SendPacket(p)
+		if err != nil {
+			log.Printf("[+] Error occured during SendMSG request: %s\n", err.Error())
+			return err
+		}
+		return nil
+	}
+	_, err := net.SendPacketDirectly(p)
+	if err != nil {
+		log.Printf("[+] Error occured during SendMSG request: %s\n", err.Error())
+		return err
+	}
+	return nil
+}
+
+// BroadcastMSG - Broadcasts a message to all peers. It will receive
+// a response in the form of a BroadcastMSGResponse request, which
+// it will handle through a BroadcastMSGResponseHandler
+func (net *Network) BroadcastMSG(msg []byte) error {
 	p := Packet{
 		PVersion:      ProtocolVersion,
-		Type:          "MSG",
+		Type:          "BroadcastMSG",
 		SourceID:      net.MyID,
 		DestinationID: []byte(""), // this gets filled in when the message gets broadcasted
 		SourceIP:      net.MyIP,
 		DestinationIP: "", // this gets filled in when the message gets broadcasted
-		Data:          data,
+		Data:          msg,
 		HopLimit:      HopLimitDefault,
-		SendType:      PacketSingleCast,
+		SendType:      PacketBroadCast,
 	}
 	err := net.BroadcastPacket(p)
 	return err
+}
+
+// BroadcastMSGResponse - This is a request that is sent
+// to the BroadcastMSGResponseHandler in response to a BroadcastMSG.
+// It can either send the packet directly or go through
+// the entire flooding algorithm to get the packet to the correct computer.
+func (net *Network) BroadcastMSGResponse(peerID []byte, peerIP string, msg []byte) error {
+	p := &Packet{
+		PVersion:      ProtocolVersion,
+		Type:          "BroadcastMSGResponse",
+		SourceID:      net.MyID,
+		DestinationID: peerID, // this gets filled in when the message gets broadcasted
+		SourceIP:      net.MyIP,
+		DestinationIP: peerIP, // this gets filled in when the message gets broadcasted
+		Data:          msg,
+		HopLimit:      HopLimitDefault,
+		SendType:      PacketSingleCast,
+	}
+	log.Printf("[+] Sending BroadcastMSGResponse response (%v, %v)\n", base64.URLEncoding.EncodeToString(p.DestinationID), net.Nodes[string(p.DestinationID)].IPAddr)
+	if peerIP == "" {
+		err := net.SendPacket(p)
+		if err != nil {
+			log.Printf("[+] Error occured during BroadcastMSGResponse response: %s\n", err.Error())
+			return err
+		}
+	}
+	_, err := net.SendPacketDirectly(p)
+	if err != nil {
+		log.Printf("[+] Error occured during BroadcastMSGResponse response: %s\n", err.Error())
+		return err
+	}
+	return nil
 }

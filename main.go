@@ -13,6 +13,10 @@ import (
 
 var wg sync.WaitGroup
 
+var servers []string = []string{
+	"127.0.0.1:" + network.Port,
+}
+
 func main() {
 	/*Test mining*/
 	fmt.Println("[+] Testing blockchain...")
@@ -28,12 +32,16 @@ func main() {
 
 	// Start first node in the network
 	net := network.MakeNetwork()
+	network.InitMSGQueue()
 	// Wont' work because it uses public IP and my router has NAT: net.BootstrapNetwork()
 	net.MyIP = "127.0.0.1" + network.Port
 	net.MyID = blockchain.GenRandBytes(32)
 	http.HandleFunc("/JOIN", net.JoinHandler)
 	http.HandleFunc("/PING", net.PingHandler)
 	http.HandleFunc("/PONG", net.PongHandler)
+	http.HandleFunc("/SendMSG", net.SendMSGHandler)
+	http.HandleFunc("/BroadcastMSG", net.BroadcastMSGHandler)
+	http.HandleFunc("/BroadcastMSGResponse", net.BroadcastMSGResponseHandler)
 	wg.Add(1)
 	defer wg.Done()
 	go func() {
